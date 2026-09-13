@@ -10,33 +10,63 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConsoleRouteImport } from './routes/console'
+import { Route as HowItWorksRouteImport } from './routes/how-it-works'
+import { Route as RunRunIdRouteImport } from './routes/run.$runId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConsoleRoute = ConsoleRouteImport.update({
+  id: '/console',
+  path: '/console',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HowItWorksRoute = HowItWorksRouteImport.update({
+  id: '/how-it-works',
+  path: '/how-it-works',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RunRunIdRoute = RunRunIdRouteImport.update({
+  id: '/run/$runId',
+  path: '/run/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/console': typeof ConsoleRoute
+  '/how-it-works': typeof HowItWorksRoute
+  '/run/$runId': typeof RunRunIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/console': typeof ConsoleRoute
+  '/how-it-works': typeof HowItWorksRoute
+  '/run/$runId': typeof RunRunIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/console': typeof ConsoleRoute
+  '/how-it-works': typeof HowItWorksRoute
+  '/run/$runId': typeof RunRunIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/console' | '/how-it-works' | '/run/$runId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/console' | '/how-it-works' | '/run/$runId'
+  id: '__root__' | '/' | '/console' | '/how-it-works' | '/run/$runId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ConsoleRoute: typeof ConsoleRoute
+  HowItWorksRoute: typeof HowItWorksRoute
+  RunRunIdRoute: typeof RunRunIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +78,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/console': {
+      id: '/console'
+      path: '/console'
+      fullPath: '/console'
+      preLoaderRoute: typeof ConsoleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/how-it-works': {
+      id: '/how-it-works'
+      path: '/how-it-works'
+      fullPath: '/how-it-works'
+      preLoaderRoute: typeof HowItWorksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/run/$runId': {
+      id: '/run/$runId'
+      path: '/run/$runId'
+      fullPath: '/run/$runId'
+      preLoaderRoute: typeof RunRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ConsoleRoute: ConsoleRoute,
+  HowItWorksRoute: HowItWorksRoute,
+  RunRunIdRoute: RunRunIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
