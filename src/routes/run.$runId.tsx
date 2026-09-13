@@ -152,6 +152,7 @@ function RunPage() {
           current = res.run;
           qc.setQueryData(["run", runId], current);
           qc.invalidateQueries({ queryKey: ["audience", runId] });
+          qc.invalidateQueries({ queryKey: ["run-actions", runId] });
           if (res.step === "done") break;
         }
       } catch {
@@ -543,7 +544,7 @@ function LiveSurface({ run }: { run: Run }) {
       qc.invalidateQueries({ queryKey: ["decision-log", run.id] });
       qc.invalidateQueries({ queryKey: ["run-actions", run.id] });
     } catch {
-      toast.error("The decision endpoint returned an error.");
+      toast.error("The server decision returned an error.");
     } finally {
       setPending(null);
     }

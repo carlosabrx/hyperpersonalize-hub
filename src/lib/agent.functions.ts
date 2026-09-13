@@ -246,7 +246,7 @@ export const getShowcaseCustomers = createServerFn({ method: "GET" }).handler(as
   return pickShowcaseCustomers(await loadCustomers());
 });
 
-/** The personalization decision endpoint: what does this customer see, and why. */
+/** Server-side personalization decision: what does this customer see, and why. */
 export const decide = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ runId: z.string().uuid(), customerId: z.string().uuid() }).parse(input),
@@ -309,7 +309,7 @@ export const decide = createServerFn({ method: "POST" })
       in_holdout: assignment.inHoldout,
       reasons: trace,
       latency_ms: Number((audienceMs + assignMs).toFixed(3)),
-      precomputed: true,
+      precomputed: false,
     });
     await recordAction(
       run.id,

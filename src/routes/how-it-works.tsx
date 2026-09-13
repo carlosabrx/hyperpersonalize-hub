@@ -161,8 +161,9 @@ function HowItWorks() {
         </p>
         <p>
           So the split is: segment membership computed in batch and cached, assignment evaluated per
-          request. The latency panel on a live run shows both halves separately, which is the number
-          an engineering reviewer will ask about first.
+          request. This demo stops short of that production architecture: it evaluates segment rules
+          against an already-loaded sample record, then measures only that in-process rule evaluation
+          and assignment. The latency panel explicitly excludes retrieval, logging and network time.
         </p>
       </Section>
 
