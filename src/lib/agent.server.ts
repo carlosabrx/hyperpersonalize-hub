@@ -358,7 +358,7 @@ ${rows
       `${r.key} (${r.label}): ${r.visitors} visitors, ${r.conversions} conversions, rate ${(r.rate * 100).toFixed(2)}%, lift ${r.lift_vs_control == null ? "control" : r.lift_vs_control.toFixed(1) + "%"}, confidence ${(r.confidence * 100).toFixed(1)}%`,
   )
   .join("\n")}`,
-    maxOutputTokens: 400,
+    maxOutputTokens: 1200,
     providerOptions: { lovable: { reasoning_effort: "low" } },
   });
 
