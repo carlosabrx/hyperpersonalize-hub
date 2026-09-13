@@ -184,12 +184,28 @@ function Landing() {
                 </Button>
               ))}
             </div>
-            <Link
-              to="/console"
-              className="mt-9 inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              Open the console
-            </Link>
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              <Link
+                to="/console"
+                className="inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Open the console
+              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={openingExample}
+                onClick={openExample}
+                className="h-11 px-6 text-sm"
+              >
+                {openingExample ? "Opening…" : "Open a finished example run"}
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              The example is a saved run from an earlier session, already through approval and
+              readout — nothing is generated when you open it.
+            </p>
+
           </div>
         </div>
       </section>
