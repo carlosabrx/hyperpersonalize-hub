@@ -181,7 +181,8 @@ const experimentSchema = z.object({
   holdout_pct: z.number(),
   traffic_split: z.array(z.object({ key: z.string(), pct: z.number() })),
   min_sample_per_variant: z.number(),
-  expected_days: z.number(),
+  expected_days: z.number().nullish(),
+  expected_duration_days: z.number().nullish(),
   guardrails: z.array(z.string()).nullish(),
   reasoning: z.string(),
 });
