@@ -194,8 +194,9 @@ function HowItWorks() {
         </p>
         <p>
           Simulated: every customer record, brand rule, approved asset, past experiment and result
-          number. The readout is deterministic for a run, but it is not observed business
-          performance. Nothing on this site is a real performance claim about any business.
+          number. The numeric result rows are deterministic for a run; the recommendation is generated
+          from those rows. Neither is observed business performance. Nothing on this site is a real
+          performance claim about any business.
         </p>
       </Section>
 

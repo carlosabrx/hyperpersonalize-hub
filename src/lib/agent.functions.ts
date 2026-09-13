@@ -418,7 +418,7 @@ export const generateResults = createServerFn({ method: "POST" })
     await recordAction(
       run.id,
       "Readout generated",
-      "Generated the deterministic simulated result set and recommendation.",
+      "Calculated deterministic simulated result rows, then generated an agent recommendation.",
       "agent",
     );
     return { run: next as Run, outcome: "readout_ready" as const };

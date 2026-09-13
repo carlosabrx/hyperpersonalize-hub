@@ -812,8 +812,8 @@ function ActionLog({ runId }: { runId: string }) {
   });
 
   const actorLabel: Record<RunAction["actor"], string> = {
-    agent: "Agent",
-    human: "Human approval",
+    agent: "Agent alone",
+    human: "Human",
     system: "System",
   };
 
