@@ -29,11 +29,15 @@ function contextBlock(ctx: {
   surfaceAssets: Asset[];
   history: PastExperiment[];
 }) {
+  // Keep the prompt small: surface-relevant assets first, then a couple of others,
+  // and only the most recent experiments. Long prompts are the main cost of a slow step.
+  const others = ctx.assets.filter((a) => !ctx.surfaceAssets.includes(a)).slice(0, 3);
+  const assets = [...ctx.surfaceAssets, ...others].slice(0, 8);
   return `BRAND RULES (must be followed exactly):
 ${ctx.rules.map((r) => `- [${r.category}] ${r.rule}`).join("\n")}
 
 APPROVED ASSET LIBRARY (reuse before writing anything new; past_lift is the lift it achieved):
-${ctx.assets
+${assets
   .map(
     (a) =>
       `- "${a.name}" (surface: ${a.surface}, tags: ${a.tags.join("/")}, past_lift: ${a.past_lift ?? "n/a"}%)
@@ -45,12 +49,14 @@ ${ctx.assets
 
 PAST EXPERIMENT HISTORY:
 ${ctx.history
+  .slice(0, 4)
   .map(
     (h) =>
       `- ${h.name} (${h.ran_at}, ${h.surface}): audience ${h.audience_summary}; winner ${h.winner}; ${h.lift}% on ${h.metric}. ${h.notes}`,
   )
   .join("\n")}`;
 }
+
 
 const audienceSchema = z.object({
   summary: z.string(),
