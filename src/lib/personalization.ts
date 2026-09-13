@@ -81,6 +81,15 @@ export type Run = {
   reasoning: string | null;
   approval_note: string | null;
   approved_at: string | null;
+  sample_progress_pct: number;
+  created_at: string;
+};
+
+export type RunAction = {
+  id: string;
+  action: string;
+  detail: string;
+  actor: "agent" | "human" | "system";
   created_at: string;
 };
 

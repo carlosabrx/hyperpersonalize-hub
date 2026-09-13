@@ -1,4 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { createRun } from "@/lib/agent.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -15,6 +20,8 @@ export const Route = createFileRoute("/")({
         content:
           "A working demo: one growth goal in, a ready-to-launch web personalization experiment out — with a human approval gate.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Landing,
@@ -44,7 +51,7 @@ const STEPS = [
   {
     n: "05",
     title: "Decisions",
-    body: "A live surface decides per visitor in under a millisecond and records exactly why they saw what they saw.",
+    body: "A server call applies deterministic assignment logic and records why each visitor saw a variant. The displayed timing excludes data fetch, logging and network latency.",
   },
   {
     n: "06",
@@ -54,6 +61,27 @@ const STEPS = [
 ];
 
 function Landing() {
+  const create = useServerFn(createRun);
+  const navigate = useNavigate();
+  const [startingGoal, setStartingGoal] = useState<string | null>(null);
+
+  async function startPreset(goal: string, surface: string) {
+    setStartingGoal(goal);
+    try {
+      const run = await create({ data: { goal, surface } });
+      navigate({ to: "/run/$runId", params: { runId: run.id } });
+    } catch {
+      toast.error("The run could not be started. Please try again.");
+      setStartingGoal(null);
+    }
+  }
+
+  const presets = [
+    ["Lift loyalty signups among high-spend repeat buyers on the account page.", "account"],
+    ["Get first-time visitors researching footwear to add to cart.", "product"],
+    ["Move Silver members one order closer to Gold.", "account"],
+  ] as const;
+
   return (
     <div>
       <section className="border-b border-border/70">
@@ -123,17 +151,20 @@ function Landing() {
             <p className="mt-3 max-w-2xl text-muted-foreground">
               No segment builder, no targeting rules, no ticket for the design team.
             </p>
-            <ul className="mt-8 space-y-3 font-mono text-sm text-foreground">
-              <li className="border-l-2 border-primary pl-4">
-                Lift loyalty signups among high-spend repeat buyers on the account page.
-              </li>
-              <li className="border-l-2 border-border pl-4">
-                Get first-time visitors researching footwear to add to cart.
-              </li>
-              <li className="border-l-2 border-border pl-4">
-                Move Silver members one order closer to Gold.
-              </li>
-            </ul>
+            <div className="mt-8 grid gap-3">
+              {presets.map(([goal, surface]) => (
+                <Button
+                  key={goal}
+                  type="button"
+                  variant="outline"
+                  disabled={startingGoal !== null}
+                  onClick={() => startPreset(goal, surface)}
+                  className="h-auto min-h-11 justify-start whitespace-normal border-l-2 border-l-primary px-4 py-3 text-left font-mono text-sm leading-relaxed"
+                >
+                  {startingGoal === goal ? "Starting run…" : goal}
+                </Button>
+              ))}
+            </div>
             <Link
               to="/console"
               className="mt-9 inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
