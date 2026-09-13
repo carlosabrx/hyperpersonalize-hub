@@ -64,12 +64,52 @@ const audienceSchema = z.object({
   reasoning: z.string(),
 });
 
+/**
+ * Models on this gateway do not enforce JSON schemas, so we ask for JSON, parse it
+ * ourselves and normalise field names. That is far more reliable than failing a step
+ * because a model renamed one key.
+ */
+async function jsonCall(system: string, prompt: string): Promise<Record<string, unknown>> {
+  const { text } = await generateText({
+    model: gateway(),
+    system: `${system}\n\nRespond with a single JSON object and nothing else. No markdown fence, no commentary.`,
+    prompt,
+  });
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1) throw new Error("The agent did not return a usable answer.");
+  return JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
+}
+
+function pick(obj: Record<string, unknown>, keys: string[]): unknown {
+  for (const k of keys) {
+    const v = obj[k];
+    if (v !== undefined && v !== null) return v;
+  }
+  return null;
+}
+
+function num(obj: Record<string, unknown>, keys: string[]): number | null {
+  const v = pick(obj, keys);
+  return typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : null;
+}
+
+function strArr(obj: Record<string, unknown>, keys: string[]): string[] | null {
+  const v = pick(obj, keys);
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === "string") return [v];
+  return null;
+}
+
+function str(obj: Record<string, unknown>, keys: string[], fallback = ""): string {
+  const v = pick(obj, keys);
+  return typeof v === "string" ? v : fallback;
+}
+
 export async function proposeAudience(goal: string, surface: string): Promise<AudienceRules> {
   const ctx = await loadContext(surface);
-  const { output } = await generateText({
-    model: gateway(),
-    output: Output.object({ schema: audienceSchema }),
-    system: `You are the audience-building skill of a web personalization agent for a retail brand.
+  const raw = await jsonCall(
+    `You are the audience-building skill of a web personalization agent for a retail brand.
 Translate a growth goal into a filter over the existing customer table. Use the smallest set of
 conditions that expresses the goal — never add a condition the goal does not imply. Set unused
 fields to null. Aim for an audience between roughly 5% and 40% of the base.
