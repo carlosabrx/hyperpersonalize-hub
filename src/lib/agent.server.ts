@@ -108,6 +108,29 @@ const variantsSchema = z.object({
   ),
 });
 
+type RawVariant = z.infer<typeof variantsSchema>["variants"][number];
+
+/** Accepts either { variants: [...] } or { control: {...}, b: {...}, c: {...} }. */
+function coerceVariantSet(raw: unknown): { reasoning: string; variants: RawVariant[] } {
+  const obj = (raw ?? {}) as Record<string, unknown>;
+  const reasoning = typeof obj["reasoning"] === "string" ? (obj["reasoning"] as string) : "";
+  if (Array.isArray(obj["variants"])) {
+    return { reasoning, variants: obj["variants"] as RawVariant[] };
+  }
+  const variants = Object.entries(obj)
+    .filter(([k, v]) => k !== "reasoning" && v && typeof v === "object" && "headline" in (v as object))
+    .map(([k, v]) => {
+      const rv = v as Partial<RawVariant>;
+      return {
+        ...rv,
+        key: rv.key ?? k,
+        label: rv.label ?? (k === "control" ? "Control" : `Variant ${k.toUpperCase()}`),
+      } as RawVariant;
+    });
+  if (variants.length === 0) throw new Error("The agent returned no usable variants.");
+  return { reasoning, variants };
+}
+
 export async function proposeVariants(
   goal: string,
   surface: string,
