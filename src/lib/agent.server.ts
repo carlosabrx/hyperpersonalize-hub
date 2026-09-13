@@ -139,23 +139,16 @@ explaining the thresholds you chose and what past experiments suggested them.`,
   };
 }
 
-const variantsSchema = z.object({
-  reasoning: z.string(),
-  variants: z.array(
-    z.object({
-      key: z.string(),
-      label: z.string(),
-      headline: z.string(),
-      body: z.string(),
-      cta: z.string(),
-      reused_asset_name: z.string().nullish(),
-      rationale: z.string(),
-      brand_rules_followed: z.array(z.string()).nullish(),
-    }),
-  ),
-});
-
-type RawVariant = z.infer<typeof variantsSchema>["variants"][number];
+type RawVariant = {
+  key: string;
+  label: string;
+  headline: string;
+  body: string;
+  cta: string;
+  reused_asset_name?: string | null;
+  rationale?: string;
+  brand_rules_followed?: string[] | null;
+};
 
 /** Accepts either { variants: [...] } or { control: {...}, b: {...}, c: {...} }. */
 function coerceVariantSet(raw: unknown): { reasoning: string; variants: RawVariant[] } {
@@ -164,7 +157,11 @@ function coerceVariantSet(raw: unknown): { reasoning: string; variants: RawVaria
   if (Array.isArray(obj["variants"])) {
     return { reasoning, variants: obj["variants"] as RawVariant[] };
   }
-  const variants = Object.entries(obj)
+  const source =
+    obj["variants"] && typeof obj["variants"] === "object"
+      ? (obj["variants"] as Record<string, unknown>)
+      : obj;
+  const variants = Object.entries(source)
     .filter(([k, v]) => k !== "reasoning" && v && typeof v === "object" && "headline" in (v as object))
     .map(([k, v]) => {
       const rv = v as Partial<RawVariant>;
@@ -184,12 +181,8 @@ export async function proposeVariants(
   audienceSummary: string,
 ): Promise<VariantSet> {
   const ctx = await loadContext(surface);
-  let raw: unknown;
-  try {
-    const { output } = await generateText({
-      model: gateway(),
-      output: Output.object({ schema: variantsSchema }),
-      system: `You are the content-assembly skill of a web personalization agent.
+  const raw = await jsonCall(
+    `You are the content-assembly skill of a web personalization agent.
 Produce exactly three variants for the named surface:
 1. key "control" — the existing plain experience, taken from the asset library's control asset.
 2. key "b" and key "c" — challengers.
@@ -200,39 +193,25 @@ Headlines must be 48 characters or fewer. Obey every brand rule. Never invent an
 deadline or stock claim. brand_rules_followed lists the specific rules that shaped the copy.
 rationale is one sentence tying the variant to past performance.
 Return an object with two top-level fields: "reasoning" (a string) and "variants" (an ARRAY of the
-three variant objects, each with its own "key" and "label"). Never key the variants by name.`,
-      prompt: `Goal: ${goal}\nSurface: ${surface}\nAudience: ${audienceSummary}\n\n${contextBlock(ctx)}`,
-    });
-    raw = output;
-  } catch (err) {
-    // Some models return the variants keyed by name instead of as an array. Recover
-    // from the raw text rather than failing the whole step.
-    const value = (err as { value?: unknown; text?: string }).value;
-    const text = (err as { text?: string }).text;
-    raw = value ?? (text ? JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) : null);
-  }
+three variant objects, each with "key", "label", "headline", "body", "cta", "reused_asset_name",
+"rationale" and "brand_rules_followed"). Never key the variants by name.`,
+    `Goal: ${goal}\nSurface: ${surface}\nAudience: ${audienceSummary}\n\n${contextBlock(ctx)}`,
+  );
   const set = coerceVariantSet(raw);
   return {
     reasoning: set.reasoning,
     variants: set.variants.map((v) => ({
-      ...v,
-      headline: v.headline.slice(0, 48),
+      key: v.key,
+      label: v.label,
+      headline: String(v.headline).slice(0, 48),
+      body: String(v.body ?? ""),
+      cta: String(v.cta ?? "Continue"),
+      rationale: v.rationale ?? "",
       reused_asset_name: v.reused_asset_name ?? null,
       brand_rules_followed: v.brand_rules_followed ?? [],
     })),
   };
 }
-
-const experimentSchema = z.object({
-  metric: z.string(),
-  holdout_pct: z.number(),
-  traffic_split: z.array(z.object({ key: z.string(), pct: z.number() })),
-  min_sample_per_variant: z.number(),
-  expected_days: z.number().nullish(),
-  expected_duration_days: z.number().nullish(),
-  guardrails: z.array(z.string()).nullish(),
-  reasoning: z.string(),
-});
 
 export async function proposeExperiment(
   goal: string,
@@ -242,28 +221,54 @@ export async function proposeExperiment(
   variantKeys: string[],
 ): Promise<ExperimentConfig> {
   const ctx = await loadContext(surface);
-  const { output } = await generateText({
-    model: gateway(),
-    output: Output.object({ schema: experimentSchema }),
-    system: `You are the experiment-configuration skill of a web personalization agent.
+  const raw = await jsonCall(
+    `You are the experiment-configuration skill of a web personalization agent.
 Choose one primary success metric, a holdout percentage between 5 and 15, an even traffic split
 across the given variant keys (percentages summing to 100, excluding the holdout), a minimum sample
 per variant that could detect a lift of a few percent, an expected duration in days, and two or three
 guardrails (metrics that must not degrade, or conditions that should stop the test).
+Use exactly these top-level keys: "metric" (string), "holdout_pct" (number), "traffic_split" (ARRAY
+of objects with "key" and "pct"), "min_sample_per_variant" (number), "expected_days" (number),
+"guardrails" (array of strings), "reasoning" (string).
 reasoning explains the sample-size and holdout choices in plain language.`,
-    prompt: `Goal: ${goal}\nSurface: ${surface}\nAudience: ${audienceSummary}
+    `Goal: ${goal}\nSurface: ${surface}\nAudience: ${audienceSummary}
 Qualifying customers in the base: ${audienceSize}
 Variant keys: ${variantKeys.join(", ")}
 
 ${contextBlock(ctx)}`,
-  });
-  const cfg = output;
+  );
+
+  const rawSplit = pick(raw, ["traffic_split", "split", "allocation"]);
+  let split: { key: string; pct: number }[] = [];
+  if (Array.isArray(rawSplit)) {
+    split = (rawSplit as Record<string, unknown>[]).map((s) => ({
+      key: String(pick(s, ["key", "variant", "variant_key"]) ?? ""),
+      pct: num(s, ["pct", "percent", "percentage", "traffic_pct"]) ?? 0,
+    }));
+  } else if (rawSplit && typeof rawSplit === "object") {
+    split = Object.entries(rawSplit as Record<string, unknown>).map(([k, v]) => ({
+      key: k,
+      pct: typeof v === "number" ? v : Number(v) || 0,
+    }));
+  }
+  split = split.filter((s) => variantKeys.includes(s.key));
+  if (split.length === 0) {
+    const even = Math.round(100 / variantKeys.length);
+    split = variantKeys.map((k) => ({ key: k, pct: even }));
+  }
+
   return {
-    ...cfg,
-    expected_days: cfg.expected_days ?? cfg.expected_duration_days ?? 14,
-    guardrails: cfg.guardrails ?? [],
-    holdout_pct: Math.min(15, Math.max(5, Math.round(cfg.holdout_pct))),
-    traffic_split: cfg.traffic_split.filter((v) => variantKeys.includes(v.key)),
+    metric: str(raw, ["metric", "primary_metric", "success_metric"], "conversion rate"),
+    reasoning: str(raw, ["reasoning", "rationale"]),
+    holdout_pct: Math.min(15, Math.max(5, Math.round(num(raw, ["holdout_pct", "holdout"]) ?? 10))),
+    min_sample_per_variant: Math.round(
+      num(raw, ["min_sample_per_variant", "min_sample", "sample_per_variant"]) ?? 2000,
+    ),
+    expected_days: Math.round(
+      num(raw, ["expected_days", "expected_duration_days", "duration_days"]) ?? 14,
+    ),
+    guardrails: strArr(raw, ["guardrails", "guardrail_metrics"]) ?? [],
+    traffic_split: split,
   };
 }
 
