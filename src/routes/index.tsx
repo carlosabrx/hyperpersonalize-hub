@@ -62,8 +62,10 @@ const STEPS = [
 
 function Landing() {
   const create = useServerFn(createRun);
+  const example = useServerFn(getExampleRun);
   const navigate = useNavigate();
   const [startingGoal, setStartingGoal] = useState<string | null>(null);
+  const [openingExample, setOpeningExample] = useState(false);
 
   async function startPreset(goal: string, surface: string) {
     setStartingGoal(goal);
@@ -75,6 +77,23 @@ function Landing() {
       setStartingGoal(null);
     }
   }
+
+  async function openExample() {
+    setOpeningExample(true);
+    try {
+      const saved = await example();
+      if (!saved) {
+        toast.error("No finished example is saved yet. Start a goal above to create one.");
+        setOpeningExample(false);
+        return;
+      }
+      navigate({ to: "/run/$runId", params: { runId: saved.id } });
+    } catch {
+      toast.error("The saved example could not be opened.");
+      setOpeningExample(false);
+    }
+  }
+
 
   const presets = [
     ["Lift loyalty signups among high-spend repeat buyers on the account page.", "account"],
