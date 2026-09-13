@@ -26,6 +26,8 @@ export const Route = createFileRoute("/console")({
         content:
           "The agent proposes audience, variants and experiment setup from one plain-language goal.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   loader: ({ context }) => context.queryClient.ensureQueryData(runsQuery),

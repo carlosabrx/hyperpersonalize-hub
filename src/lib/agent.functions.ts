@@ -7,11 +7,29 @@ import {
   type Customer,
   type ExperimentConfig,
   type Run,
+  type RunAction,
   type VariantSet,
 } from "./personalization";
 
 const RUN_COLUMNS =
-  "id, goal, surface, status, audience, variants, experiment, results, reasoning, approval_note, approved_at, created_at";
+  "id, goal, surface, status, audience, variants, experiment, results, reasoning, approval_note, approved_at, sample_progress_pct, created_at";
+
+async function recordAction(
+  runId: string,
+  action: string,
+  detail: string,
+  actor: RunAction["actor"],
+) {
+  const { serverSupabase } = await import("./demo.server");
+  const sb = serverSupabase();
+  const { error } = await sb.from("run_actions").insert({
+    run_id: runId,
+    action,
+    detail,
+    actor,
+  });
+  if (error) throw new Error(error.message);
+}
 
 export const createRun = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
@@ -25,6 +43,12 @@ export const createRun = createServerFn({ method: "POST" })
       .select(RUN_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
+    await recordAction(
+      (row as Run).id,
+      "Goal submitted",
+      "Created this personalization run from a reviewer-supplied goal.",
+      "human",
+    );
     return row as Run;
   });
 
@@ -71,6 +95,12 @@ export const advanceRun = createServerFn({ method: "POST" })
         .eq("id", run.id)
         .select(RUN_COLUMNS)
         .single();
+      await recordAction(
+        run.id,
+        "Audience proposed",
+        "Translated the goal into explicit customer rules.",
+        "agent",
+      );
       return { run: next as Run, step: "audience" as const };
     }
 
@@ -82,6 +112,12 @@ export const advanceRun = createServerFn({ method: "POST" })
         .eq("id", run.id)
         .select(RUN_COLUMNS)
         .single();
+      await recordAction(
+        run.id,
+        "Content assembled",
+        "Searched approved assets and prepared three variants.",
+        "agent",
+      );
       return { run: next as Run, step: "content" as const };
     }
 
@@ -102,6 +138,12 @@ export const advanceRun = createServerFn({ method: "POST" })
         .eq("id", run.id)
         .select(RUN_COLUMNS)
         .single();
+      await recordAction(
+        run.id,
+        "Experiment configured",
+        "Set the metric, holdout, traffic split, sample requirement, and guardrails.",
+        "agent",
+      );
       return { run: next as Run, step: "experiment" as const };
     }
 
@@ -153,6 +195,14 @@ export const approveRun = createServerFn({ method: "POST" })
       .select(RUN_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
+    await recordAction(
+      data.id,
+      data.decision === "approve" ? "Approved and launched" : "Changes requested",
+      data.decision === "approve"
+        ? "A human approved the proposal before any decisions could be served."
+        : data.note?.trim() || "A human returned the proposal for revision.",
+      "human",
+    );
     return row as Run;
   });
 
@@ -181,6 +231,12 @@ export const redraftRun = createServerFn({ method: "POST" })
       .select(RUN_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
+    await recordAction(
+      data.id,
+      "Redraft requested",
+      `Returned the ${data.step} step to the agent for another draft.`,
+      "human",
+    );
     return row as Run;
   });
 
@@ -190,7 +246,7 @@ export const getShowcaseCustomers = createServerFn({ method: "GET" }).handler(as
   return pickShowcaseCustomers(await loadCustomers());
 });
 
-/** The personalization decision endpoint: what does this customer see, and why. */
+/** Server-side personalization decision: what does this customer see, and why. */
 export const decide = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ runId: z.string().uuid(), customerId: z.string().uuid() }).parse(input),
@@ -253,8 +309,14 @@ export const decide = createServerFn({ method: "POST" })
       in_holdout: assignment.inHoldout,
       reasons: trace,
       latency_ms: Number((audienceMs + assignMs).toFixed(3)),
-      precomputed: true,
+      precomputed: false,
     });
+    await recordAction(
+      run.id,
+      "Decision served",
+      `Evaluated ${customer.name} and served ${assignment.inHoldout ? "holdout" : variantKey}.`,
+      "system",
+    );
 
     return {
       customer,
@@ -291,8 +353,23 @@ export const getDecisionLog = createServerFn({ method: "GET" })
     }[];
   });
 
-export const generateResults = createServerFn({ method: "POST" })
+export const getRunActions = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const { serverSupabase } = await import("./demo.server");
+    const { data: rows, error } = await serverSupabase()
+      .from("run_actions")
+      .select("id, action, detail, actor, created_at")
+      .eq("run_id", data.id)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (rows ?? []) as RunAction[];
+  });
+
+export const generateResults = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid(), fastForward: z.boolean().optional() }).parse(input),
+  )
   .handler(async ({ data }) => {
     const { serverSupabase, loadContext } = await import("./demo.server");
     const { simulateResults } = await import("./agent.server");
@@ -300,6 +377,23 @@ export const generateResults = createServerFn({ method: "POST" })
     const { data: row } = await sb.from("runs").select(RUN_COLUMNS).eq("id", data.id).single();
     const run = row as Run;
     if (!run?.variants || !run.experiment) throw new Error("Run is not live yet.");
+
+    if (!data.fastForward && run.sample_progress_pct < 38) {
+      const { data: early, error } = await sb
+        .from("runs")
+        .update({ sample_progress_pct: 38 })
+        .eq("id", run.id)
+        .select(RUN_COLUMNS)
+        .single();
+      if (error) throw new Error(error.message);
+      await recordAction(
+        run.id,
+        "Early read refused",
+        "Stopped analysis at 38% of the required sample; no result interpretation was produced.",
+        "agent",
+      );
+      return { run: early as Run, outcome: "insufficient_sample" as const };
+    }
 
     const ctx = await loadContext(run.surface);
     const results = await simulateResults(
@@ -311,11 +405,23 @@ export const generateResults = createServerFn({ method: "POST" })
     );
     const { data: next } = await sb
       .from("runs")
-      .update({ results })
+      .update({ results, sample_progress_pct: 100 })
       .eq("id", run.id)
       .select(RUN_COLUMNS)
       .single();
-    return next as Run;
+    await recordAction(
+      run.id,
+      "Sample fast-forwarded",
+      "Advanced the simulation to the required sample size.",
+      "system",
+    );
+    await recordAction(
+      run.id,
+      "Readout generated",
+      "Calculated deterministic simulated result rows, then generated an agent recommendation.",
+      "agent",
+    );
+    return { run: next as Run, outcome: "readout_ready" as const };
   });
 
 export const getBrandContext = createServerFn({ method: "GET" }).handler(async () => {

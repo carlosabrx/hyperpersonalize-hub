@@ -15,6 +15,8 @@ export const Route = createFileRoute("/how-it-works")({
         content:
           "Agent-vs-human ownership, the context layer, trust sequencing and where the commercial value lands.",
       },
+      { property: "og:type", content: "article" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: HowItWorks,
@@ -159,8 +161,9 @@ function HowItWorks() {
         </p>
         <p>
           So the split is: segment membership computed in batch and cached, assignment evaluated per
-          request. The latency panel on a live run shows both halves separately, which is the number
-          an engineering reviewer will ask about first.
+          request. This demo stops short of that production architecture: it evaluates segment rules
+          against an already-loaded sample record, then measures only that in-process rule evaluation
+          and assignment. The latency panel explicitly excludes retrieval, logging and network time.
         </p>
       </Section>
 
@@ -178,14 +181,39 @@ function HowItWorks() {
 
       <Section n="07" title="What is real here and what is not">
         <p>
-          Real: the agent calls, the audience evaluation against a seeded customer table, the
-          decision endpoint, the deterministic bucketing, the latency measurements, the logged
-          decision traces, the approval state machine.
+          Real: the model calls that propose the audience, content and experiment; server functions
+          that read and write each run; audience-rule evaluation against the seeded customer table;
+          deterministic bucketing; a human approval gate; and persisted decision and action logs.
         </p>
         <p>
-          Simulated: the customer records, the brand rules, the asset library, the experiment history
-          and every result number. Nothing on this site is a real performance claim about any
-          business.
+          The decision path is a real server call, not a client-only function. Its displayed timing
+          measures only in-process JavaScript rule evaluation and assignment. It excludes customer
+          and run retrieval, log writes, serialization and network time. The demo evaluates rules on
+          already-loaded sample records; a production system would precompute segment membership and
+          retrieve that cached membership during the request.
+        </p>
+        <p>
+          Simulated: every customer record, brand rule, approved asset, past experiment and result
+          number. The numeric result rows are deterministic for a run; the recommendation is generated
+          from those rows. Neither is observed business performance. Nothing on this site is a real
+          performance claim about any business.
+        </p>
+      </Section>
+
+      <Section n="08" title="What this does not solve">
+        <p>
+          Cold start remains: an anonymous visitor with no identity or history gives the system very
+          little signal, so a safe default experience still matters.
+        </p>
+        <p>
+          Segment membership can become stale during a session. A customer who buys, returns an item
+          or changes tier may keep an earlier decision until the cache is refreshed or explicitly
+          invalidated.
+        </p>
+        <p>
+          Testing many variants across many segments creates a multiple-comparisons problem. A
+          production readout needs correction, pre-registered hypotheses or stricter stopping rules;
+          this demo does not implement those controls.
         </p>
       </Section>
 
