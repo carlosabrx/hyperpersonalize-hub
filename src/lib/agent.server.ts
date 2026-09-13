@@ -213,6 +213,7 @@ ${contextBlock(ctx)}`,
   const cfg = output;
   return {
     ...cfg,
+    expected_days: cfg.expected_days ?? cfg.expected_duration_days ?? 14,
     guardrails: cfg.guardrails ?? [],
     holdout_pct: Math.min(15, Math.max(5, Math.round(cfg.holdout_pct))),
     traffic_split: cfg.traffic_split.filter((v) => variantKeys.includes(v.key)),
