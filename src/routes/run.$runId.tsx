@@ -147,7 +147,7 @@ function RunPage() {
         let current: Run = run;
         let guard = 0;
         while (current.status === "drafting" && guard++ < 5) {
-          setBusy(!current.audience ? "audience" : !current.variants ? "content" : "experiment");
+          setBusy(!current.audience ? "audience" : "content experiment");
           const res = await advance({ data: { id: runId } });
           current = res.run;
           qc.setQueryData(["run", runId], current);
