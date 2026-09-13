@@ -11,10 +11,18 @@ import {
   getAudiencePreview,
   getDecisionLog,
   getRun,
+  getRunActions,
   getShowcaseCustomers,
   redraftRun,
 } from "@/lib/agent.functions";
-import { describeRules, SURFACES, type Run, type Variant } from "@/lib/personalization";
+import { Button } from "@/components/ui/button";
+import {
+  describeRules,
+  SURFACES,
+  type Run,
+  type RunAction,
+  type Variant,
+} from "@/lib/personalization";
 
 const runQuery = (id: string) =>
   queryOptions({
@@ -37,6 +45,8 @@ export const Route = createFileRoute("/run/$runId")({
         content:
           "The full chain: audience, content, experiment, approval, live decisions and a results readout.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   loader: ({ context, params }) => context.queryClient.ensureQueryData(runQuery(params.runId)),
@@ -196,6 +206,7 @@ function RunPage() {
           <ResultsPanel run={run} />
         </>
       )}
+      <ActionLog runId={run.id} />
     </div>
   );
 }
@@ -458,6 +469,7 @@ function ApprovalGate({ run }: { run: Run }) {
     try {
       const next = await approve({ data: { id: run.id, decision, note: note || undefined } });
       qc.setQueryData(["run", run.id], next);
+      qc.invalidateQueries({ queryKey: ["run-actions", run.id] });
       toast.success(decision === "approve" ? "Approved and live." : "Sent back with your note.");
     } catch {
       toast.error("That did not save. Please try again.");
@@ -529,6 +541,7 @@ function LiveSurface({ run }: { run: Run }) {
       const d = await decideFn({ data: { runId: run.id, customerId } });
       setDecision(d);
       qc.invalidateQueries({ queryKey: ["decision-log", run.id] });
+      qc.invalidateQueries({ queryKey: ["run-actions", run.id] });
     } catch {
       toast.error("The decision endpoint returned an error.");
     } finally {
@@ -541,8 +554,8 @@ function LiveSurface({ run }: { run: Run }) {
       <p className="label-caps">04 · Live surface</p>
       <h2 className="mt-3 text-3xl">Pick a customer, see their page</h2>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Each click calls the decision endpoint for real: it evaluates audience membership, assigns a
-        bucket, records the trace and reports how long it took.
+        Each click makes a real server call that evaluates the sample customer's rules, assigns a
+        stable bucket and records the trace. The timing below covers only that in-process JavaScript.
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -628,7 +641,7 @@ function LiveSurface({ run }: { run: Run }) {
               </p>
               <ul className="mt-4 space-y-2 text-xs text-muted-foreground">
                 <li className="flex justify-between gap-3">
-                  <span>Audience membership (precomputed nightly, looked up in-request)</span>
+                  <span>Rule evaluation on an already-loaded sample record</span>
                   <span className="font-mono text-foreground">
                     {decision.timing.audienceMs.toFixed(2)}ms
                   </span>
@@ -641,9 +654,9 @@ function LiveSurface({ run }: { run: Run }) {
                 </li>
               </ul>
               <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-                Segment membership is the expensive part, so it is computed in batch and cached.
-                Assignment and variant selection must be real-time, because they depend on the
-                request. That split is what keeps the endpoint under a millisecond.
+                This number excludes data retrieval, log writes, serialization and network time. In
+                production, segment membership would be computed in batch and cached; only stable
+                assignment and variant selection would remain in the request path.
               </p>
             </div>
           </div>
@@ -685,11 +698,12 @@ function ResultsPanel({ run }: { run: Run }) {
   const [loading, setLoading] = useState(false);
   const results = run.results;
 
-  async function run_() {
+  async function run_(fastForward = false) {
     setLoading(true);
     try {
-      const next = await gen({ data: { id: run.id } });
-      qc.setQueryData(["run", run.id], next);
+      const response = await gen({ data: { id: run.id, fastForward } });
+      qc.setQueryData(["run", run.id], response.run);
+      qc.invalidateQueries({ queryKey: ["run-actions", run.id] });
     } catch {
       toast.error("The readout could not be generated.");
     } finally {
@@ -706,14 +720,25 @@ function ResultsPanel({ run }: { run: Run }) {
         something to reason about. Nothing here is a real performance claim.
       </p>
 
-      {!results ? (
-        <button
-          onClick={run_}
-          disabled={loading}
-          className="mt-6 inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
-        >
-          {loading ? "Analysing…" : "Run the analysis"}
-        </button>
+      {!results && run.sample_progress_pct < 38 ? (
+        <Button onClick={() => run_(false)} disabled={loading} size="lg" className="mt-6">
+          {loading ? "Checking sample…" : "Run the analysis"}
+        </Button>
+      ) : !results ? (
+        <div className="mt-6 border-l-2 border-primary bg-card px-6 py-5">
+          <p className="label-caps">Analysis refused</p>
+          <h3 className="mt-2 text-2xl">38% of required sample — no read available</h3>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Looking now would invite peeking bias. The agent will not calculate lift, confidence or a
+            recommendation before the minimum sample is reached.
+          </p>
+          <div className="mt-5 h-1.5 max-w-md overflow-hidden rounded-full bg-secondary">
+            <div className="h-full w-[38%] bg-primary" />
+          </div>
+          <Button onClick={() => run_(true)} disabled={loading} size="lg" className="mt-5">
+            {loading ? "Fast-forwarding…" : "Fast-forward to required sample"}
+          </Button>
+        </div>
       ) : (
         <div className="mt-6 space-y-4">
           <div className="overflow-x-auto rounded-lg border border-border">
@@ -775,6 +800,59 @@ function ResultsPanel({ run }: { run: Run }) {
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+function ActionLog({ runId }: { runId: string }) {
+  const { data: actions } = useQuery({
+    queryKey: ["run-actions", runId],
+    queryFn: () => getRunActions({ data: { id: runId } }),
+  });
+
+  const actorLabel: Record<RunAction["actor"], string> = {
+    agent: "Agent",
+    human: "Human approval",
+    system: "System",
+  };
+
+  if (!actions?.length) return null;
+
+  return (
+    <section className="mt-14">
+      <p className="label-caps">06 · Action log</p>
+      <h2 className="mt-3 text-3xl">Who did what</h2>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+        The workflow history separates autonomous work, system execution and decisions that required
+        human approval.
+      </p>
+      <div className="mt-6 overflow-x-auto rounded-lg border border-border">
+        <table className="w-full min-w-150 text-left text-sm">
+          <thead>
+            <tr className="border-b border-border bg-card">
+              {['Time', 'Action', 'Owner', 'Detail'].map((heading) => (
+                <th key={heading} className="label-caps px-5 py-3 font-normal">{heading}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {actions.map((entry) => (
+              <tr key={entry.id} className="bg-card/50 align-top">
+                <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-muted-foreground">
+                  {new Date(entry.created_at).toLocaleTimeString()}
+                </td>
+                <td className="px-5 py-3 text-foreground">{entry.action}</td>
+                <td className="whitespace-nowrap px-5 py-3">
+                  <span className={entry.actor === "human" ? "text-signal" : "text-primary"}>
+                    {actorLabel[entry.actor]}
+                  </span>
+                </td>
+                <td className="px-5 py-3 text-muted-foreground">{entry.detail}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

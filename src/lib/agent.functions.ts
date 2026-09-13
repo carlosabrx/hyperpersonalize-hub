@@ -15,12 +15,13 @@ const RUN_COLUMNS =
   "id, goal, surface, status, audience, variants, experiment, results, reasoning, approval_note, approved_at, sample_progress_pct, created_at";
 
 async function recordAction(
-  sb: ReturnType<(typeof import("./demo.server"))["serverSupabase"]>,
   runId: string,
   action: string,
   detail: string,
   actor: RunAction["actor"],
 ) {
+  const { serverSupabase } = await import("./demo.server");
+  const sb = serverSupabase();
   const { error } = await sb.from("run_actions").insert({
     run_id: runId,
     action,
@@ -43,7 +44,6 @@ export const createRun = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     await recordAction(
-      serverSupabase(),
       (row as Run).id,
       "Goal submitted",
       "Created this personalization run from a reviewer-supplied goal.",
@@ -96,7 +96,6 @@ export const advanceRun = createServerFn({ method: "POST" })
         .select(RUN_COLUMNS)
         .single();
       await recordAction(
-        sb,
         run.id,
         "Audience proposed",
         "Translated the goal into explicit customer rules.",
@@ -114,7 +113,6 @@ export const advanceRun = createServerFn({ method: "POST" })
         .select(RUN_COLUMNS)
         .single();
       await recordAction(
-        sb,
         run.id,
         "Content assembled",
         "Searched approved assets and prepared three variants.",
@@ -141,7 +139,6 @@ export const advanceRun = createServerFn({ method: "POST" })
         .select(RUN_COLUMNS)
         .single();
       await recordAction(
-        sb,
         run.id,
         "Experiment configured",
         "Set the metric, holdout, traffic split, sample requirement, and guardrails.",
@@ -199,7 +196,6 @@ export const approveRun = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     await recordAction(
-      serverSupabase(),
       data.id,
       data.decision === "approve" ? "Approved and launched" : "Changes requested",
       data.decision === "approve"
@@ -236,7 +232,6 @@ export const redraftRun = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     await recordAction(
-      serverSupabase(),
       data.id,
       "Redraft requested",
       `Returned the ${data.step} step to the agent for another draft.`,
@@ -317,7 +312,6 @@ export const decide = createServerFn({ method: "POST" })
       precomputed: true,
     });
     await recordAction(
-      sb,
       run.id,
       "Decision served",
       `Evaluated ${customer.name} and served ${assignment.inHoldout ? "holdout" : variantKey}.`,
@@ -393,7 +387,6 @@ export const generateResults = createServerFn({ method: "POST" })
         .single();
       if (error) throw new Error(error.message);
       await recordAction(
-        sb,
         run.id,
         "Early read refused",
         "Stopped analysis at 38% of the required sample; no result interpretation was produced.",
@@ -417,14 +410,12 @@ export const generateResults = createServerFn({ method: "POST" })
       .select(RUN_COLUMNS)
       .single();
     await recordAction(
-      sb,
       run.id,
       "Sample fast-forwarded",
       "Advanced the simulation to the required sample size.",
       "system",
     );
     await recordAction(
-      sb,
       run.id,
       "Readout generated",
       "Generated the deterministic simulated result set and recommendation.",
