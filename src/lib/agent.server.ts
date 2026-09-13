@@ -114,21 +114,28 @@ Translate a growth goal into a filter over the existing customer table. Use the 
 conditions that expresses the goal — never add a condition the goal does not imply. Set unused
 fields to null. Aim for an audience between roughly 5% and 40% of the base.
 ${CUSTOMER_SCHEMA}
+Use exactly these top-level JSON keys, at the top level and nowhere nested:
+"summary" (string), "reasoning" (string), "min_spend" (number or null), "min_orders" (number or
+null), "min_tenure_days" (number or null), "max_tenure_days" (number or null), "categories" (array
+of category strings or null), "loyalty_tiers" (array of tier strings or null), "min_sessions_30d"
+(number or null). Every threshold you mention in the reasoning MUST also appear as its numeric
+field — never describe a filter you leave null.
 "summary" is one sentence a marketer would recognise. "reasoning" is two or three sentences
 explaining the thresholds you chose and what past experiments suggested them.`,
-    prompt: `Goal: ${goal}\nSurface: ${surface}\n\n${contextBlock(ctx)}`,
-  });
-  const o = output;
+    `Goal: ${goal}\nSurface: ${surface}\n\n${contextBlock(ctx)}`,
+  );
+  const nested = (raw["rules"] ?? raw["filters"] ?? {}) as Record<string, unknown>;
+  const o = { ...nested, ...raw };
   return {
-    summary: o.summary,
-    reasoning: o.reasoning,
-    min_spend: o.min_spend ?? null,
-    min_orders: o.min_orders ?? null,
-    min_tenure_days: o.min_tenure_days ?? null,
-    max_tenure_days: o.max_tenure_days ?? null,
-    categories: o.categories ?? null,
-    loyalty_tiers: o.loyalty_tiers ?? null,
-    min_sessions_30d: o.min_sessions_30d ?? null,
+    summary: str(o, ["summary"], goal),
+    reasoning: str(o, ["reasoning", "rationale"]),
+    min_spend: num(o, ["min_spend", "min_total_spend", "total_spend_min"]),
+    min_orders: num(o, ["min_orders", "min_order_count", "order_count_min"]),
+    min_tenure_days: num(o, ["min_tenure_days", "tenure_days_min"]),
+    max_tenure_days: num(o, ["max_tenure_days", "tenure_days_max"]),
+    categories: strArr(o, ["categories", "top_categories", "top_category"]),
+    loyalty_tiers: strArr(o, ["loyalty_tiers", "loyalty_tier", "tiers"]),
+    min_sessions_30d: num(o, ["min_sessions_30d", "sessions_30d_min", "min_sessions"]),
   };
 }
 
