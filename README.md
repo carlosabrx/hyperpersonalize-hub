@@ -1,98 +1,98 @@
-# Agentic Growth Engine
+# Closed Loop
 
-i would like to build project(s) that closely resemble what hightouch is describing here. My available tech stack includes: Claude, Cursor, n8n, Google AI/Flow, Lovable, Supabase, PostHog, Railway, Resend, and Gamma. Brainstorm several ideas for me that provide the best value for this role.About Hightouch
+**An agentic personalization console.** Describe a growth goal in plain language; an agent builds the audience, assembles on-brand variants, configures the experiment with a holdout, and stops at a human approval gate before anything reaches a visitor.
 
-Hightouch is an Agentic Marketing Platform powered by the industry-leading Composable CDP. With complete brand context, customer data, and performance history in one place, every marketer finally has the power to build and ship end-to-end campaigns themselves. Teams move faster, stay on brand, and get AI marketing that actually works.
+**[Live demo](https://hyperpersonalize-hub.lovable.app)** · **[Product write-up](https://the-coordination-problem-xjp6hty.gamma.site/)** · **[How it works](https://hyperpersonalize-hub.lovable.app/how-it-works)**
 
-Founded in 2019 and headquartered in San Francisco, Hightouch enables marketing teams to analyze performance, brainstorm ideas, and generate creative at a speed and quality that wasn't previously possible.
+<!-- Drop the 90-second walkthrough here once recorded. GitHub renders mp4 inline if you
+     commit the file to demo/ and reference it as a relative path:
+     https://github.com/carlosabrx/hyperpersonalize-hub/assets/... -->
 
-Named a Leader in the 2026 Gartner® Magic Quadrant™ for Customer Data Platforms, Hightouch is trusted by leading enterprises like Domino's, Spotify, Aritzia, Cars.com, Ramp, and PetSmart.
+---
 
-At Hightouch, our mission is to help our customers leverage data and AI to grow their businesses. The team is ambitious, impact-driven, efficient — and we believe humility, kindness, and compassion are essential to our success. If you're energized by velocity, obsessed with raising the bar, and want to build alongside people who care deeply about each other and our customers, we'd love to meet you.
+## Why this exists
 
-The Customer Problem
+A growth team that wants to run fifty web personalization experiments a quarter instead of eight doesn't need fifty more ideas. It needs to stop spending three weeks per test pulling an audience out of the warehouse, getting copy through brand review, and configuring the experiment correctly. Every one of those handoffs is a queue, and queues — not thinking time — set the ceiling on test velocity.
 
-When you open Spotify, the homepage is different for every user. When you browse Nike's site, products are ranked by what Nike thinks you'll buy. When you log into Chase, offers are tailored to your spending. This is web and mobile personalization: deciding in real time what each customer sees inside your product. It directly moves conversion, retention, and revenue at the point where customers are already engaged.
+Existing tools (Optimizely, Adobe Target) solve the infrastructure and leave the coordination untouched. This is a prototype of the other answer: an agent that drafts the entire chain, and one human who approves it.
 
-Almost nobody does it well outside of companies that build it from scratch. A single experiment (testing whether high-spend users convert better seeing a loyalty upsell on the account page) requires an analyst to build the segment, a PM to write targeting rules, a designer to create variants, an engineer to instrument the test, and someone to monitor results. Most teams run 5–10 per quarter and end up with a handful of static rules covering a fraction of their users.
+I built it as a working argument rather than a deck, while looking at founding PM work in agentic marketing.
 
-The tools that exist (Optimizely, Adobe Target) handle infrastructure but don't solve the coordination problem. Every experiment, audience, and piece of content still requires manual configuration. They also force companies to duplicate customer data into a proprietary store, adding months of implementation and permanent vendor lock-in.
+## What it does
 
-Why Agents are the Solution
+| | Step | |
+|---|---|---|
+| 01 | **Audience** | Turns the goal into a concrete filter over existing customer data and shows how many people qualify |
+| 02 | **Content** | Searches the approved asset library first, reuses what fits, writes new copy only when nothing does |
+| 03 | **Experiment** | Configures traffic split, holdout, primary metric, sample size and guardrails |
+| 04 | **Approval** | Nothing serves until a human approves; any step can be sent back with a note |
+| 05 | **Decisions** | Assigns each visitor and records why they saw what they saw |
+| 06 | **Readout** | Lift, confidence, and a recommendation — keep testing, declare a winner, or reallocate |
 
-The shift from "AI assists a step" to "AI owns a workflow" is already happening in software engineering. Personalization is ready for the same shift.
+## The three product arguments
 
-Today: A growth team testing whether high-intent visitors convert better with a comparison page spends 2–4 weeks coordinating across tools and people. They run maybe 8 experiments that quarter.
+### 1. The autonomy boundary matters more than the model
 
-With agents: The growth lead describes the goal. An agent identifies the audience from existing customer data, generates variants informed by past performance, configures the experiment with holdout groups, launches it, monitors significance, and reallocates traffic. The human reviews before launch. Calendar time: hours. The same team runs 50+ experiments per quarter because the coordination cost drops to nearly zero.
+Anything reversible and mechanical goes to the agent. Anything touching real customers, brand risk, or budget stays with a person.
 
-Agents handle the full chain as one workflow: audience, content, experiment, optimization. Instead of a bunch of manual steps, agents rethink this as a continuously improving closed loop.
+| Step | Agent does | Human owns |
+|---|---|---|
+| Audience | Translates the goal into filters, shows who qualifies | Confirms it's the segment they meant |
+| Content | Searches approved assets first, writes only when nothing fits | Brand judgement on anything new |
+| Experiment | Sets split, holdout, sample size, guardrails | Accepts the speed/certainty tradeoff |
+| Launch | Nothing | The approval — always |
+| Serving | Assigns every visitor and logs why | Reads the trace when something looks wrong |
+| Readout | Computes lift and confidence, recommends | Decides whether to ship, iterate, or kill |
 
-Why Hightouch, Why Now
+### 2. Trust is earned in a sequence, not granted
 
-More than 1,000 enterprises—like Domino’s, Chime, Spotify, Ramp, Whoop, Grammarly, use Hightouch to run their marketing. Earlier this year we launched the Agentic Marketing Platform with two pillars:
+No team hands an agent live traffic on day one. The adoption path is staged: agent drafts and a human approves every step → human approves content only → agent reallocates traffic between already-approved variants once confidence clears a threshold. Full autonomy, if it ever arrives, arrives last.
 
-Agentic Advertising Studio. Agents analyze performance, competitor creative, and brand guidelines, then assemble ad concepts across Meta, Google, TikTok, and LinkedIn.
+This demo deliberately sits at stage one, with the gate in the middle of the page rather than buried in a settings menu. Burying it would signal that it's a formality.
 
-Agentic Lifecycle Studio. Agents identify lifecycle opportunities, draft audiences, assemble on-brand email and SMS campaigns, and orchestrate them through Braze, Iterable, Salesforce, and Adobe.
+### 3. Batch where you can, real-time where you must
 
-Advertising covers paid media. Lifecycle covers email, SMS, and push. Agentic Personalization is the third pillar: what customers experience inside the website and mobile app. Different buyer (product and growth teams), different workflow (real-time experimentation), different technical surface (browser SDKs and edge delivery). Same agent infrastructure and data foundation.
+Personalization dies on latency. Working out whether someone belongs to a high-spend-repeat-buyer segment means aggregating order history — too slow to do while a page renders. Choosing which variant that person sees depends on the request and can't be precomputed.
 
-What no competitor can replicate:
+So the split is: **segment membership computed in batch and cached; variant assignment evaluated per request.** The agent is a control-plane system that writes policy offline. It is never in the request path.
 
-Agent orchestration. 25+ specialized skills for audience building, content generation, campaign analysis, and multi-step workflow coordination.
+This has consequences the demo doesn't solve — see below.
 
-Content assembly. Agents search existing asset libraries for reusable on-brand content before generating anything new, which is what makes output trustworthy enough for enterprises to ship.
+## What's real and what's simulated
 
-Marketing and brand context. Persistent layer connecting customer data, brand guidelines, creative assets, and performance history so agents operate grounded in how the business works.
+Being precise here matters more than looking impressive.
 
-Real-time data infrastructure. Low-latency personalization API, sub-second audience evaluation, ML-powered optimization and recommendations, event pipeline processing millions of events daily.
+**Real:** the agent calls, audience evaluation against a seeded customer table, the decision endpoint, deterministic bucketing, latency measurement, logged decision traces, and the approval state machine.
 
-The Role
+**Simulated:** customer records, brand rules, the asset library, experiment history, and every result number. Nothing here is a performance claim about any real business.
 
-Founding Product Manager for Agentic Personalization: Hightouch's third major pillar and biggest new investment. You define the product, the sequencing, and the go-to-market.
+## How it was built
 
-Customer discovery. Deep engagement with product and growth teams at enterprise companies to understand how they personalize web and mobile today, and what would earn their trust in an agent-driven approach. Translate into a roadmap tied to revenue milestones.
+Lovable and Claude, over one weekend. The tooling was a deliberate prioritization call: the questions I wanted to answer were where the human gate belongs and how segment membership gets cached. Neither required hand-writing a backend, and a weekend spent on infrastructure would have produced a worse answer to the questions that actually matter.
 
-Define the agent experience. What agents do autonomously (segments, variants, experiments, traffic allocation) vs. what needs human approval (production launches, brand-sensitive content). Design the feedback loop that builds trust over time.
+Stack: React / TypeScript / Tailwind, generated and iterated in Lovable.
 
-Scale the GTM. Co-own pipeline, join customer calls, shape competitive positioning, partner with CS on implementation playbooks.
+## What I didn't build
 
-High-visibility role working directly with founders and executive team.
+Naming these precisely is part of the work.
 
-What We're Looking For
+- **Cold start.** Most real traffic is anonymous. Precomputed segment membership does nothing for a visitor with no profile. The honest fix is deciding on in-session signals rather than history, with a well-chosen control as the fallback.
+- **Decision staleness.** A decision computed last night doesn't know someone just added a tent to their cart. The real answer is hybrid — a precomputed base decision plus a small set of fast in-session rules that can override it.
+- **Multiple comparisons.** An agent that slices results across segments will find "winners" in noise. Correction needs to be built in, not bolted on.
+- **Anything below the surface layer:** auth, real checkout, mobile SDKs, multi-tenancy, more than one slot.
 
-Zero-to-one track record. Products you built from nothing to meaningful revenue, ideally at a B2B SaaS company. Domain matters less than evidence you can find product-market fit under uncertainty.
+## Repo layout
 
-Technical depth. Can evaluate architectural tradeoffs, debate infrastructure decisions with senior engineers, and reason about things like batch vs. real-time and caching strategies at the level of product decisions.
-
-Commercial instinct. Think in terms of pipeline, conversion, and expansion. Build roadmaps that map to revenue targets.
-
-Speed. Small team, high autonomy, tight cycles. We use AI heavily in our own workflows.
-
-Cross-functional trust. This spans engineering, design, sales, CS, and leadership. You drive clarity from ambiguity.
-
-We are looking for talented, intellectually curious, and motivated individuals who are interested in tackling the problems above. This is a senior role, but we focus on impact and potential for growth more than years of experience. The salary range for this position is $240,000 - $320,000 USD per year, which is location independent in accordance with our remote-first policy. We also offer meaningful equity compensation in the form of ISO options, and offer early exercise and a 10 year post-termination exercise window.
-
-This project was built with [Lovable](https://lovable.dev).
-
-**Live app**: https://hyperpersonalize-hub.lovable.app
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/20179bf6-ac38-47c8-af6d-17064340d9f4).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
 ```
+├── docs/
+│   ├── autonomy-boundary.md      # the agent/human split, in full
+│   ├── architecture.md           # batch vs. real-time, latency notes
+│   ├── decision-log.md           # product calls made while building, with tradeoffs
+│   └── what-i-didnt-build.md     # open problems, expanded
+├── demo/                         # walkthrough video
+└── src/                          # the app
+```
+
+---
+
+*Built by [Carlos Abreu](https://www.linkedin.com/in/carlosabrx). Questions and disagreements welcome — especially about where the autonomy boundary should sit.*
