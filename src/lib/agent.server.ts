@@ -75,17 +75,27 @@ const audienceSchema = z.object({
  * ourselves and normalise field names. That is far more reliable than failing a step
  * because a model renamed one key.
  */
-async function jsonCall(system: string, prompt: string): Promise<Record<string, unknown>> {
+async function jsonCall(
+  system: string,
+  prompt: string,
+  maxOutputTokens = 1100,
+): Promise<Record<string, unknown>> {
   const { text } = await generateText({
     model: gateway(),
-    system: `${system}\n\nRespond with a single JSON object and nothing else. No markdown fence, no commentary.`,
+    system: `${system}\n\nRespond with a single JSON object and nothing else. No markdown fence, no
+commentary, no explanation before or after. Keep every string field short — one to three sentences
+at most. Do not deliberate; answer directly.`,
     prompt,
+    maxOutputTokens,
+    // Long internal deliberation is what makes a step take a minute instead of a few seconds.
+    providerOptions: { lovable: { reasoning_effort: "low" } },
   });
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1) throw new Error("The agent did not return a usable answer.");
   return JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
 }
+
 
 function pick(obj: Record<string, unknown>, keys: string[]): unknown {
   for (const k of keys) {
