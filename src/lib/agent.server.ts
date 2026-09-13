@@ -212,6 +212,8 @@ Return an object with two top-level fields: "reasoning" (a string) and "variants
 three variant objects, each with "key", "label", "headline", "body", "cta", "reused_asset_name",
 "rationale" and "brand_rules_followed"). Never key the variants by name.`,
     `Goal: ${goal}\nSurface: ${surface}\nAudience: ${audienceSummary}\n\n${contextBlock(ctx)}`,
+    1600,
+
   );
   const set = coerceVariantSet(raw);
   return {
