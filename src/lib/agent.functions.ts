@@ -75,6 +75,21 @@ export const listRuns = createServerFn({ method: "GET" }).handler(async () => {
   return (data ?? []) as Pick<Run, "id" | "goal" | "surface" | "status" | "created_at">[];
 });
 
+/** The most recent finished run, used to open a saved example instantly. */
+export const getExampleRun = createServerFn({ method: "GET" }).handler(async () => {
+  const { serverSupabase } = await import("./demo.server");
+  const { data } = await serverSupabase()
+    .from("runs")
+    .select("id, goal")
+    .not("results", "is", null)
+    .eq("status", "live")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data ?? null) as { id: string; goal: string } | null;
+});
+
+
 /** Runs the next missing step of the agent workflow and returns the updated run. */
 export const advanceRun = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
