@@ -75,6 +75,21 @@ export const listRuns = createServerFn({ method: "GET" }).handler(async () => {
   return (data ?? []) as Pick<Run, "id" | "goal" | "surface" | "status" | "created_at">[];
 });
 
+/** The most recent finished run, used to open a saved example instantly. */
+export const getExampleRun = createServerFn({ method: "GET" }).handler(async () => {
+  const { serverSupabase } = await import("./demo.server");
+  const { data } = await serverSupabase()
+    .from("runs")
+    .select("id, goal")
+    .not("results", "is", null)
+    .eq("status", "live")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data ?? null) as { id: string; goal: string } | null;
+});
+
+
 /** Runs the next missing step of the agent workflow and returns the updated run. */
 export const advanceRun = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
@@ -104,11 +119,25 @@ export const advanceRun = createServerFn({ method: "POST" })
       return { run: next as Run, step: "audience" as const };
     }
 
-    if (!run.variants) {
-      const variants = await agent.proposeVariants(run.goal, run.surface, run.audience.summary);
+    if (!run.variants || !run.experiment) {
+      // Content and experiment setup only depend on the audience, so they run concurrently.
+      // Variant keys are fixed (control/b/c), which is what makes the parallel call safe.
+      const customers = await loadCustomers();
+      const size = customers.filter((c) => evaluateAudience(c, run.audience as AudienceRules).matches)
+        .length;
+      const [variants, experiment] = await Promise.all([
+        agent.proposeVariants(run.goal, run.surface, run.audience.summary),
+        agent.proposeExperiment(
+          run.goal,
+          run.surface,
+          run.audience.summary,
+          size,
+          ["control", "b", "c"],
+        ),
+      ]);
       const { data: next } = await sb
         .from("runs")
-        .update({ variants })
+        .update({ variants, experiment, status: "proposed" })
         .eq("id", run.id)
         .select(RUN_COLUMNS)
         .single();
@@ -118,26 +147,6 @@ export const advanceRun = createServerFn({ method: "POST" })
         "Searched approved assets and prepared three variants.",
         "agent",
       );
-      return { run: next as Run, step: "content" as const };
-    }
-
-    if (!run.experiment) {
-      const customers = await loadCustomers();
-      const size = customers.filter((c) => evaluateAudience(c, run.audience as AudienceRules).matches)
-        .length;
-      const experiment = await agent.proposeExperiment(
-        run.goal,
-        run.surface,
-        run.audience.summary,
-        size,
-        (run.variants as VariantSet).variants.map((v) => v.key),
-      );
-      const { data: next } = await sb
-        .from("runs")
-        .update({ experiment, status: "proposed" })
-        .eq("id", run.id)
-        .select(RUN_COLUMNS)
-        .single();
       await recordAction(
         run.id,
         "Experiment configured",
@@ -146,6 +155,7 @@ export const advanceRun = createServerFn({ method: "POST" })
       );
       return { run: next as Run, step: "experiment" as const };
     }
+
 
     return { run, step: "done" as const };
   });

@@ -147,7 +147,7 @@ function RunPage() {
         let current: Run = run;
         let guard = 0;
         while (current.status === "drafting" && guard++ < 5) {
-          setBusy(!current.audience ? "audience" : !current.variants ? "content" : "experiment");
+          setBusy(!current.audience ? "audience" : "content experiment");
           const res = await advance({ data: { id: runId } });
           current = res.run;
           qc.setQueryData(["run", runId], current);
@@ -336,7 +336,7 @@ function VariantCard({ v }: { v: Variant }) {
 function ContentStep({ run, busy }: { run: Run; busy: string | null }) {
   const qc = useQueryClient();
   const redraft = useServerFn(redraftRun);
-  const state = run.variants ? "done" : busy === "content" ? "working" : "pending";
+  const state = run.variants ? "done" : busy?.includes("content") ? "working" : "pending";
 
   return (
     <StepCard
@@ -375,7 +375,7 @@ function ContentStep({ run, busy }: { run: Run; busy: string | null }) {
 function ExperimentStep({ run, busy }: { run: Run; busy: string | null }) {
   const qc = useQueryClient();
   const redraft = useServerFn(redraftRun);
-  const state = run.experiment ? "done" : busy === "experiment" ? "working" : "pending";
+  const state = run.experiment ? "done" : busy?.includes("experiment") ? "working" : "pending";
   const e = run.experiment;
 
   return (

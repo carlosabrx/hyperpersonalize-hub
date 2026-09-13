@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { createRun } from "@/lib/agent.functions";
+import { createRun, getExampleRun } from "@/lib/agent.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -62,8 +62,10 @@ const STEPS = [
 
 function Landing() {
   const create = useServerFn(createRun);
+  const example = useServerFn(getExampleRun);
   const navigate = useNavigate();
   const [startingGoal, setStartingGoal] = useState<string | null>(null);
+  const [openingExample, setOpeningExample] = useState(false);
 
   async function startPreset(goal: string, surface: string) {
     setStartingGoal(goal);
@@ -75,6 +77,23 @@ function Landing() {
       setStartingGoal(null);
     }
   }
+
+  async function openExample() {
+    setOpeningExample(true);
+    try {
+      const saved = await example();
+      if (!saved) {
+        toast.error("No finished example is saved yet. Start a goal above to create one.");
+        setOpeningExample(false);
+        return;
+      }
+      navigate({ to: "/run/$runId", params: { runId: saved.id } });
+    } catch {
+      toast.error("The saved example could not be opened.");
+      setOpeningExample(false);
+    }
+  }
+
 
   const presets = [
     ["Lift loyalty signups among high-spend repeat buyers on the account page.", "account"],
@@ -165,12 +184,28 @@ function Landing() {
                 </Button>
               ))}
             </div>
-            <Link
-              to="/console"
-              className="mt-9 inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              Open the console
-            </Link>
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              <Link
+                to="/console"
+                className="inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Open the console
+              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={openingExample}
+                onClick={openExample}
+                className="h-11 px-6 text-sm"
+              >
+                {openingExample ? "Opening…" : "Open a finished example run"}
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              The example is a saved run from an earlier session, already through approval and
+              readout — nothing is generated when you open it.
+            </p>
+
           </div>
         </div>
       </section>

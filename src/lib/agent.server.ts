@@ -29,11 +29,15 @@ function contextBlock(ctx: {
   surfaceAssets: Asset[];
   history: PastExperiment[];
 }) {
+  // Keep the prompt small: surface-relevant assets first, then a couple of others,
+  // and only the most recent experiments. Long prompts are the main cost of a slow step.
+  const others = ctx.assets.filter((a) => !ctx.surfaceAssets.includes(a)).slice(0, 3);
+  const assets = [...ctx.surfaceAssets, ...others].slice(0, 8);
   return `BRAND RULES (must be followed exactly):
 ${ctx.rules.map((r) => `- [${r.category}] ${r.rule}`).join("\n")}
 
 APPROVED ASSET LIBRARY (reuse before writing anything new; past_lift is the lift it achieved):
-${ctx.assets
+${assets
   .map(
     (a) =>
       `- "${a.name}" (surface: ${a.surface}, tags: ${a.tags.join("/")}, past_lift: ${a.past_lift ?? "n/a"}%)
@@ -45,12 +49,14 @@ ${ctx.assets
 
 PAST EXPERIMENT HISTORY:
 ${ctx.history
+  .slice(0, 4)
   .map(
     (h) =>
       `- ${h.name} (${h.ran_at}, ${h.surface}): audience ${h.audience_summary}; winner ${h.winner}; ${h.lift}% on ${h.metric}. ${h.notes}`,
   )
   .join("\n")}`;
 }
+
 
 const audienceSchema = z.object({
   summary: z.string(),
@@ -69,17 +75,27 @@ const audienceSchema = z.object({
  * ourselves and normalise field names. That is far more reliable than failing a step
  * because a model renamed one key.
  */
-async function jsonCall(system: string, prompt: string): Promise<Record<string, unknown>> {
+async function jsonCall(
+  system: string,
+  prompt: string,
+  maxOutputTokens = 3000,
+): Promise<Record<string, unknown>> {
   const { text } = await generateText({
     model: gateway(),
-    system: `${system}\n\nRespond with a single JSON object and nothing else. No markdown fence, no commentary.`,
+    system: `${system}\n\nRespond with a single JSON object and nothing else. No markdown fence, no
+commentary, no explanation before or after. Keep every string field short — one to three sentences
+at most. Do not deliberate; answer directly.`,
     prompt,
+    maxOutputTokens,
+    // Long internal deliberation is what makes a step take a minute instead of a few seconds.
+    providerOptions: { lovable: { reasoning_effort: "low" } },
   });
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1) throw new Error("The agent did not return a usable answer.");
   return JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
 }
+
 
 function pick(obj: Record<string, unknown>, keys: string[]): unknown {
   for (const k of keys) {
@@ -196,6 +212,8 @@ Return an object with two top-level fields: "reasoning" (a string) and "variants
 three variant objects, each with "key", "label", "headline", "body", "cta", "reused_asset_name",
 "rationale" and "brand_rules_followed"). Never key the variants by name.`,
     `Goal: ${goal}\nSurface: ${surface}\nAudience: ${audienceSummary}\n\n${contextBlock(ctx)}`,
+    4000,
+
   );
   const set = coerceVariantSet(raw);
   return {
@@ -340,7 +358,10 @@ ${rows
       `${r.key} (${r.label}): ${r.visitors} visitors, ${r.conversions} conversions, rate ${(r.rate * 100).toFixed(2)}%, lift ${r.lift_vs_control == null ? "control" : r.lift_vs_control.toFixed(1) + "%"}, confidence ${(r.confidence * 100).toFixed(1)}%`,
   )
   .join("\n")}`,
+    maxOutputTokens: 1200,
+    providerOptions: { lovable: { reasoning_effort: "low" } },
   });
+
 
   const match = text.match(/ACTION:\s*(.+)$/im);
   return {
