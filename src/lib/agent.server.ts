@@ -114,10 +114,12 @@ export async function proposeVariants(
   audienceSummary: string,
 ): Promise<VariantSet> {
   const ctx = await loadContext(surface);
-  const { output } = await generateText({
-    model: gateway(),
-    output: Output.object({ schema: variantsSchema }),
-    system: `You are the content-assembly skill of a web personalization agent.
+  let raw: unknown;
+  try {
+    const { output } = await generateText({
+      model: gateway(),
+      output: Output.object({ schema: variantsSchema }),
+      system: `You are the content-assembly skill of a web personalization agent.
 Produce exactly three variants for the named surface:
 1. key "control" — the existing plain experience, taken from the asset library's control asset.
 2. key "b" and key "c" — challengers.
@@ -126,10 +128,20 @@ a minimal edit) and set reused_asset_name to that asset's name. Only write new c
 fits, and then set reused_asset_name to null.
 Headlines must be 48 characters or fewer. Obey every brand rule. Never invent an offer, discount,
 deadline or stock claim. brand_rules_followed lists the specific rules that shaped the copy.
-rationale is one sentence tying the variant to past performance.`,
-    prompt: `Goal: ${goal}\nSurface: ${surface}\nAudience: ${audienceSummary}\n\n${contextBlock(ctx)}`,
-  });
-  const set = output;
+rationale is one sentence tying the variant to past performance.
+Return an object with two top-level fields: "reasoning" (a string) and "variants" (an ARRAY of the
+three variant objects, each with its own "key" and "label"). Never key the variants by name.`,
+      prompt: `Goal: ${goal}\nSurface: ${surface}\nAudience: ${audienceSummary}\n\n${contextBlock(ctx)}`,
+    });
+    raw = output;
+  } catch (err) {
+    // Some models return the variants keyed by name instead of as an array. Recover
+    // from the raw text rather than failing the whole step.
+    const value = (err as { value?: unknown; text?: string }).value;
+    const text = (err as { text?: string }).text;
+    raw = value ?? (text ? JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) : null);
+  }
+  const set = coerceVariantSet(raw);
   return {
     reasoning: set.reasoning,
     variants: set.variants.map((v) => ({
