@@ -206,6 +206,41 @@ export type Database = {
         }
         Relationships: []
       }
+      run_actions: {
+        Row: {
+          action: string
+          actor: string
+          created_at: string
+          detail: string
+          id: string
+          run_id: string
+        }
+        Insert: {
+          action: string
+          actor: string
+          created_at?: string
+          detail: string
+          id?: string
+          run_id: string
+        }
+        Update: {
+          action?: string
+          actor?: string
+          created_at?: string
+          detail?: string
+          id?: string
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_actions_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       runs: {
         Row: {
           approval_note: string | null
@@ -217,6 +252,7 @@ export type Database = {
           id: string
           reasoning: string | null
           results: Json | null
+          sample_progress_pct: number
           status: string
           surface: string
           updated_at: string
@@ -232,6 +268,7 @@ export type Database = {
           id?: string
           reasoning?: string | null
           results?: Json | null
+          sample_progress_pct?: number
           status?: string
           surface?: string
           updated_at?: string
@@ -247,6 +284,7 @@ export type Database = {
           id?: string
           reasoning?: string | null
           results?: Json | null
+          sample_progress_pct?: number
           status?: string
           surface?: string
           updated_at?: string
